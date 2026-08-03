@@ -12,6 +12,8 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/amex-grocery-split
 
 FROM alpine:3.20
 
+LABEL org.opencontainers.image.source="https://github.com/victorpero/amex-grocery-splitter-se"
+
 RUN addgroup -S -g 1000 app && adduser -S -D -H -u 1000 -G app app
 
 COPY --from=build /out/amex-grocery-splitter-web /usr/local/bin/amex-grocery-splitter-web
