@@ -33,7 +33,6 @@ func TestServerGetRendersUploadForm(t *testing.T) {
 func TestServerPostAnalyzesUploadedCSV(t *testing.T) {
 	server := newTestServer(t)
 	body, contentType := multipartRequestBody(t, map[string]string{
-		"amount_mode":    "absolute",
 		"currency":       "SEK",
 		"show_unmatched": "on",
 		"prefixes":       "ICA\nCOOP",
@@ -52,8 +51,9 @@ func TestServerPostAnalyzesUploadedCSV(t *testing.T) {
 	for _, want := range []string{
 		"COOP RADHUSET",
 		"APOTEKET",
-		"SEK 111,00",
-		"SEK 55,50",
+		"-SEK 111,00",
+		"-SEK 55,50",
+		"SEK 50,00",
 		"1 included",
 		"1 unmatched",
 		"Include selected",
@@ -67,7 +67,6 @@ func TestServerPostAnalyzesUploadedCSV(t *testing.T) {
 func TestServerPostIncludesSelectedUnmatchedTransactions(t *testing.T) {
 	server := newTestServer(t)
 	body, contentType := multipartRequestBody(t, map[string]string{
-		"amount_mode":    "absolute",
 		"currency":       "SEK",
 		"show_unmatched": "on",
 		"prefixes":       "ICA\nCOOP",
@@ -85,7 +84,6 @@ func TestServerPostIncludesSelectedUnmatchedTransactions(t *testing.T) {
 	state := hiddenFieldValue(t, response.Body.String(), "transactions_state")
 
 	body, contentType = multipartRequestBody(t, map[string]string{
-		"amount_mode":        "absolute",
 		"currency":           "SEK",
 		"show_unmatched":     "on",
 		"prefixes":           "ICA\nCOOP",
@@ -105,8 +103,8 @@ func TestServerPostIncludesSelectedUnmatchedTransactions(t *testing.T) {
 	for _, want := range []string{
 		"COOP RADHUSET",
 		"APOTEKET",
-		"SEK 161,00",
-		"SEK 80,50",
+		"-SEK 61,00",
+		"-SEK 30,50",
 		"2 included",
 		"0 unmatched",
 		`name="included_tx" value="1"`,
@@ -120,7 +118,6 @@ func TestServerPostIncludesSelectedUnmatchedTransactions(t *testing.T) {
 func TestServerPostRemovesSelectedMatchedTransactions(t *testing.T) {
 	server := newTestServer(t)
 	body, contentType := multipartRequestBody(t, map[string]string{
-		"amount_mode":    "absolute",
 		"currency":       "SEK",
 		"show_unmatched": "on",
 		"prefixes":       "ICA\nCOOP",
@@ -138,7 +135,6 @@ func TestServerPostRemovesSelectedMatchedTransactions(t *testing.T) {
 	state := hiddenFieldValue(t, response.Body.String(), "transactions_state")
 
 	body, contentType = multipartRequestBody(t, map[string]string{
-		"amount_mode":        "absolute",
 		"currency":           "SEK",
 		"show_unmatched":     "on",
 		"prefixes":           "ICA\nCOOP",
@@ -169,12 +165,98 @@ func TestServerPostRemovesSelectedMatchedTransactions(t *testing.T) {
 	}
 }
 
+func TestServerPostStoresAllocationsIndependently(t *testing.T) {
+	server := newTestServer(t)
+	body, contentType := multipartRequestBody(t, map[string]string{
+		"currency":     "SEK",
+		"prefixes":     "ICA\nCOOP",
+		"activity.csv": "Datum;Beskrivning;Belopp\n2026-05-11;ICA ONE;-100,00\n2026-05-12;COOP TWO;40,00\n",
+	})
+	request := httptest.NewRequest(http.MethodPost, "/", body)
+	request.Header.Set("Content-Type", contentType)
+	response := httptest.NewRecorder()
+
+	server.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("initial status = %d, want %d\nbody:\n%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	state := hiddenFieldValue(t, response.Body.String(), "transactions_state")
+
+	body, contentType = multipartRequestBody(t, map[string]string{
+		"currency":           "SEK",
+		"prefixes":           "ICA\nCOOP",
+		"transactions_state": state,
+		"allocation_tx_0":    "participant_one",
+	})
+	request = httptest.NewRequest(http.MethodPost, "/", body)
+	request.Header.Set("Content-Type", contentType)
+	response = httptest.NewRecorder()
+
+	server.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("first allocation status = %d, want %d\nbody:\n%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	bodyText := response.Body.String()
+	if got := selectedAllocation(t, bodyText, "0"); got != "participant_one" {
+		t.Fatalf("allocation for transaction 0 = %q, want participant_one", got)
+	}
+	if got := selectedAllocation(t, bodyText, "1"); got != "split_evenly" {
+		t.Fatalf("allocation for transaction 1 = %q, want split_evenly", got)
+	}
+	for _, want := range []string{"-SEK 60,00", "-SEK 80,00", "SEK 20,00"} {
+		if !strings.Contains(bodyText, want) {
+			t.Fatalf("body did not contain %q\nbody:\n%s", want, bodyText)
+		}
+	}
+	state = hiddenFieldValue(t, bodyText, "transactions_state")
+
+	body, contentType = multipartRequestBody(t, map[string]string{
+		"currency":           "SEK",
+		"prefixes":           "ICA\nCOOP",
+		"transactions_state": state,
+		"allocation_tx_1":    "participant_two",
+	})
+	request = httptest.NewRequest(http.MethodPost, "/", body)
+	request.Header.Set("Content-Type", contentType)
+	response = httptest.NewRecorder()
+
+	server.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("second allocation status = %d, want %d\nbody:\n%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	bodyText = response.Body.String()
+	if got := selectedAllocation(t, bodyText, "0"); got != "participant_one" {
+		t.Fatalf("allocation for transaction 0 after transaction 1 changed = %q, want participant_one", got)
+	}
+	if got := selectedAllocation(t, bodyText, "1"); got != "participant_two" {
+		t.Fatalf("allocation for transaction 1 = %q, want participant_two", got)
+	}
+	for _, want := range []string{"-SEK 60,00", "-SEK 100,00", "SEK 40,00"} {
+		if !strings.Contains(bodyText, want) {
+			t.Fatalf("body did not contain %q\nbody:\n%s", want, bodyText)
+		}
+	}
+}
+
+func TestServerDoesNotRenderRemovedAmountMode(t *testing.T) {
+	server := newTestServer(t)
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	response := httptest.NewRecorder()
+
+	server.ServeHTTP(response, request)
+	body := response.Body.String()
+	for _, unwanted := range []string{"amount_mode", "Signed CSV amounts"} {
+		if strings.Contains(body, unwanted) {
+			t.Fatalf("body unexpectedly contained removed amount-mode UI %q", unwanted)
+		}
+	}
+}
+
 func TestServerPostRequiresCSVFile(t *testing.T) {
 	server := newTestServer(t)
 	body, contentType := multipartRequestBody(t, map[string]string{
-		"amount_mode": "absolute",
-		"currency":    "SEK",
-		"prefixes":    "ICA\nCOOP",
+		"currency": "SEK",
+		"prefixes": "ICA\nCOOP",
 	})
 	request := httptest.NewRequest(http.MethodPost, "/", body)
 	request.Header.Set("Content-Type", contentType)
@@ -198,6 +280,20 @@ func hiddenFieldValue(t *testing.T, body string, name string) string {
 		t.Fatalf("body did not contain hidden field %q\nbody:\n%s", name, body)
 	}
 	return matches[1]
+}
+
+func selectedAllocation(t *testing.T, body string, id string) string {
+	t.Helper()
+	pattern := regexp.MustCompile(`(?s)<select name="allocation_tx_` + regexp.QuoteMeta(id) + `"[^>]*>(.*?)</select>`)
+	selectMatch := pattern.FindStringSubmatch(body)
+	if len(selectMatch) != 2 {
+		t.Fatalf("body did not contain allocation select for %q\nbody:\n%s", id, body)
+	}
+	selected := regexp.MustCompile(`<option value="([^"]+)" selected`).FindStringSubmatch(selectMatch[1])
+	if len(selected) != 2 {
+		t.Fatalf("allocation select for %q did not contain a selected option\nselect:\n%s", id, selectMatch[1])
+	}
+	return selected[1]
 }
 
 func newTestServer(t *testing.T) *Server {

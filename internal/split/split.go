@@ -7,55 +7,73 @@ import (
 	"github.com/victorpero/amex-grocery-splitter-se/internal/transaction"
 )
 
-type AmountMode string
+// Allocation identifies how one transaction is assigned between the two
+// participants.
+type Allocation string
 
 const (
-	AmountModeAbsolute AmountMode = "absolute"
-	AmountModeSigned   AmountMode = "signed"
+	AllocationSplitEvenly    Allocation = "split_evenly"
+	AllocationParticipantOne Allocation = "participant_one"
+	AllocationParticipantTwo Allocation = "participant_two"
 )
 
+// AllocatedTransaction couples a transaction with its own allocation. Each row
+// is calculated independently, so changing one allocation never affects the
+// allocation of another row.
+type AllocatedTransaction struct {
+	Transaction transaction.Transaction
+	Allocation  Allocation
+}
+
 type Result struct {
-	TotalCents     int64
-	PerPersonCents int64
-	RemainderCents int64
+	TotalCents              int64
+	ParticipantOneHalfCents int64
+	ParticipantTwoHalfCents int64
 }
 
-func ParseAmountMode(value string) (AmountMode, error) {
-	mode := AmountMode(strings.ToLower(strings.TrimSpace(value)))
-	switch mode {
-	case AmountModeAbsolute, AmountModeSigned:
-		return mode, nil
+func ParseAllocation(value string) (Allocation, error) {
+	allocation := Allocation(strings.TrimSpace(value))
+	switch allocation {
+	case AllocationSplitEvenly, AllocationParticipantOne, AllocationParticipantTwo:
+		return allocation, nil
 	default:
-		return "", fmt.Errorf("invalid amount mode %q, expected %q or %q", value, AmountModeAbsolute, AmountModeSigned)
+		return "", fmt.Errorf("invalid allocation %q", value)
 	}
 }
 
-func Calculate(transactions []transaction.Transaction, mode AmountMode) Result {
-	total := TotalCents(transactions, mode)
-	return Result{
-		TotalCents:     total,
-		PerPersonCents: total / 2,
-		RemainderCents: total % 2,
-	}
-}
-
-func TotalCents(transactions []transaction.Transaction, mode AmountMode) int64 {
-	var total int64
+// Calculate preserves the historical CLI behavior by splitting every supplied
+// transaction evenly between the two participants.
+func Calculate(transactions []transaction.Transaction) Result {
+	allocated := make([]AllocatedTransaction, 0, len(transactions))
 	for _, tx := range transactions {
-		amount := tx.AmountCents
-		if mode == AmountModeAbsolute {
-			amount = abs(amount)
-		}
-		total += amount
+		allocated = append(allocated, AllocatedTransaction{
+			Transaction: tx,
+			Allocation:  AllocationSplitEvenly,
+		})
 	}
-	return total
+	return CalculateAllocated(allocated)
 }
 
-func abs(value int64) int64 {
-	if value < 0 {
-		return -value
+// CalculateAllocated totals signed transaction values and applies each row's
+// selected allocation. Participant amounts use half-cent units so an odd-cent
+// transaction can still be divided exactly when split evenly.
+func CalculateAllocated(transactions []AllocatedTransaction) Result {
+	var result Result
+	for _, allocated := range transactions {
+		amount := allocated.Transaction.AmountCents
+		result.TotalCents += amount
+
+		switch allocated.Allocation {
+		case AllocationParticipantOne:
+			result.ParticipantOneHalfCents += amount * 2
+		case AllocationParticipantTwo:
+			result.ParticipantTwoHalfCents += amount * 2
+		default:
+			result.ParticipantOneHalfCents += amount
+			result.ParticipantTwoHalfCents += amount
+		}
 	}
-	return value
+	return result
 }
 
 func FormatCents(currency string, cents int64) string {
@@ -70,14 +88,15 @@ func FormatCents(currency string, cents int64) string {
 	return fmt.Sprintf("%s%s %s,%02d", sign, strings.TrimSpace(currency), formatWhole(whole), fraction)
 }
 
-func FormatHalfCents(currency string, totalCents int64) string {
+// FormatHalfCents formats an amount expressed in half-cent units.
+func FormatHalfCents(currency string, halfCents int64) string {
 	sign := ""
-	if totalCents < 0 {
+	if halfCents < 0 {
 		sign = "-"
-		totalCents = -totalCents
+		halfCents = -halfCents
 	}
 
-	thousandths := totalCents * 5
+	thousandths := halfCents * 5
 	whole := thousandths / 1000
 	fraction := thousandths % 1000
 	if fraction%10 == 0 {

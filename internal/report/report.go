@@ -14,7 +14,7 @@ type Analysis struct {
 	Result    split.Result
 }
 
-func Analyze(transactions []transaction.Transaction, groceryMatcher *matcher.PrefixMatcher, amountMode split.AmountMode) Analysis {
+func Analyze(transactions []transaction.Transaction, groceryMatcher *matcher.PrefixMatcher) Analysis {
 	matched := make([]transaction.Transaction, 0)
 	unmatched := make([]transaction.Transaction, 0)
 
@@ -32,7 +32,7 @@ func Analyze(transactions []transaction.Transaction, groceryMatcher *matcher.Pre
 	return Analysis{
 		Matched:   matched,
 		Unmatched: unmatched,
-		Result:    split.Calculate(matched, amountMode),
+		Result:    split.Calculate(matched),
 	}
 }
 
@@ -43,11 +43,4 @@ func SortTransactions(transactions []transaction.Transaction) {
 		}
 		return transactions[i].Date.Before(transactions[j].Date)
 	})
-}
-
-func DisplayAmountCents(amount int64, mode split.AmountMode) int64 {
-	if mode == split.AmountModeAbsolute && amount < 0 {
-		return -amount
-	}
-	return amount
 }
