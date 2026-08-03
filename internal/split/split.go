@@ -21,8 +21,9 @@ const (
 // is calculated independently, so changing one allocation never affects the
 // allocation of another row.
 type AllocatedTransaction struct {
-	Transaction transaction.Transaction
-	Allocation  Allocation
+	Transaction      transaction.Transaction
+	SplitAmountCents int64
+	Allocation       Allocation
 }
 
 type Result struct {
@@ -47,8 +48,9 @@ func Calculate(transactions []transaction.Transaction) Result {
 	allocated := make([]AllocatedTransaction, 0, len(transactions))
 	for _, tx := range transactions {
 		allocated = append(allocated, AllocatedTransaction{
-			Transaction: tx,
-			Allocation:  AllocationSplitEvenly,
+			Transaction:      tx,
+			SplitAmountCents: tx.AmountCents,
+			Allocation:       AllocationSplitEvenly,
 		})
 	}
 	return CalculateAllocated(allocated)
@@ -60,7 +62,7 @@ func Calculate(transactions []transaction.Transaction) Result {
 func CalculateAllocated(transactions []AllocatedTransaction) Result {
 	var result Result
 	for _, allocated := range transactions {
-		amount := allocated.Transaction.AmountCents
+		amount := allocated.SplitAmountCents
 		result.TotalCents += amount
 
 		switch allocated.Allocation {

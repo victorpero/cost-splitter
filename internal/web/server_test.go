@@ -238,6 +238,79 @@ func TestServerPostStoresAllocationsIndependently(t *testing.T) {
 	}
 }
 
+func TestServerPostStoresAmountsToSplitIndependently(t *testing.T) {
+	server := newTestServer(t)
+	body, contentType := multipartRequestBody(t, map[string]string{
+		"currency":     "SEK",
+		"prefixes":     "ICA\nCOOP",
+		"activity.csv": "Datum;Beskrivning;Belopp\n2026-05-11;ICA ONE;-1500,00\n2026-05-12;COOP TWO;-500,00\n",
+	})
+	request := httptest.NewRequest(http.MethodPost, "/", body)
+	request.Header.Set("Content-Type", contentType)
+	response := httptest.NewRecorder()
+
+	server.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("initial status = %d, want %d\nbody:\n%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	state := hiddenFieldValue(t, response.Body.String(), "transactions_state")
+
+	body, contentType = multipartRequestBody(t, map[string]string{
+		"currency":           "SEK",
+		"prefixes":           "ICA\nCOOP",
+		"transactions_state": state,
+		"split_amount_tx_0":  "-600,00",
+	})
+	request = httptest.NewRequest(http.MethodPost, "/", body)
+	request.Header.Set("Content-Type", contentType)
+	response = httptest.NewRecorder()
+
+	server.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("first adjustment status = %d, want %d\nbody:\n%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	bodyText := response.Body.String()
+	if got := splitAmountValue(t, bodyText, "0"); got != "-600,00" {
+		t.Fatalf("amount to split for transaction 0 = %q, want -600,00", got)
+	}
+	if got := splitAmountValue(t, bodyText, "1"); got != "-500,00" {
+		t.Fatalf("amount to split for transaction 1 = %q, want -500,00", got)
+	}
+	for _, want := range []string{"Imported Amount", "Amount to Split", "-SEK 1 500,00", "-SEK 1 100,00", "-SEK 550,00"} {
+		if !strings.Contains(bodyText, want) {
+			t.Fatalf("body did not contain %q\nbody:\n%s", want, bodyText)
+		}
+	}
+	state = hiddenFieldValue(t, bodyText, "transactions_state")
+
+	body, contentType = multipartRequestBody(t, map[string]string{
+		"currency":           "SEK",
+		"prefixes":           "ICA\nCOOP",
+		"transactions_state": state,
+		"split_amount_tx_1":  "-200,00",
+	})
+	request = httptest.NewRequest(http.MethodPost, "/", body)
+	request.Header.Set("Content-Type", contentType)
+	response = httptest.NewRecorder()
+
+	server.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("second adjustment status = %d, want %d\nbody:\n%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	bodyText = response.Body.String()
+	if got := splitAmountValue(t, bodyText, "0"); got != "-600,00" {
+		t.Fatalf("amount to split for transaction 0 after transaction 1 changed = %q, want -600,00", got)
+	}
+	if got := splitAmountValue(t, bodyText, "1"); got != "-200,00" {
+		t.Fatalf("amount to split for transaction 1 = %q, want -200,00", got)
+	}
+	for _, want := range []string{"-SEK 800,00", "-SEK 400,00"} {
+		if !strings.Contains(bodyText, want) {
+			t.Fatalf("body did not contain %q\nbody:\n%s", want, bodyText)
+		}
+	}
+}
+
 func TestServerDoesNotRenderRemovedAmountMode(t *testing.T) {
 	server := newTestServer(t)
 	request := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -294,6 +367,16 @@ func selectedAllocation(t *testing.T, body string, id string) string {
 		t.Fatalf("allocation select for %q did not contain a selected option\nselect:\n%s", id, selectMatch[1])
 	}
 	return selected[1]
+}
+
+func splitAmountValue(t *testing.T, body string, id string) string {
+	t.Helper()
+	pattern := regexp.MustCompile(`name="split_amount_tx_` + regexp.QuoteMeta(id) + `" value="([^"]+)"`)
+	matches := pattern.FindStringSubmatch(body)
+	if len(matches) != 2 {
+		t.Fatalf("body did not contain amount-to-split input for %q\nbody:\n%s", id, body)
+	}
+	return matches[1]
 }
 
 func newTestServer(t *testing.T) *Server {

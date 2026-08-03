@@ -27,16 +27,19 @@ func TestCalculatePreservesMixedTransactionSigns(t *testing.T) {
 func TestCalculateAllocatedKeepsEachTransactionIndependent(t *testing.T) {
 	transactions := []AllocatedTransaction{
 		{
-			Transaction: transaction.Transaction{AmountCents: -10050},
-			Allocation:  AllocationParticipantOne,
+			Transaction:      transaction.Transaction{AmountCents: -10050},
+			SplitAmountCents: -10050,
+			Allocation:       AllocationParticipantOne,
 		},
 		{
-			Transaction: transaction.Transaction{AmountCents: 2500},
-			Allocation:  AllocationParticipantTwo,
+			Transaction:      transaction.Transaction{AmountCents: 2500},
+			SplitAmountCents: 2500,
+			Allocation:       AllocationParticipantTwo,
 		},
 		{
-			Transaction: transaction.Transaction{AmountCents: -3000},
-			Allocation:  AllocationSplitEvenly,
+			Transaction:      transaction.Transaction{AmountCents: -3000},
+			SplitAmountCents: -3000,
+			Allocation:       AllocationSplitEvenly,
 		},
 	}
 
@@ -54,8 +57,8 @@ func TestCalculateAllocatedKeepsEachTransactionIndependent(t *testing.T) {
 
 func TestChangingOneAllocationDoesNotChangeAnother(t *testing.T) {
 	transactions := []AllocatedTransaction{
-		{Transaction: transaction.Transaction{AmountCents: 1000}, Allocation: AllocationSplitEvenly},
-		{Transaction: transaction.Transaction{AmountCents: 2500}, Allocation: AllocationParticipantTwo},
+		{Transaction: transaction.Transaction{AmountCents: 1000}, SplitAmountCents: 1000, Allocation: AllocationSplitEvenly},
+		{Transaction: transaction.Transaction{AmountCents: 2500}, SplitAmountCents: 2500, Allocation: AllocationParticipantTwo},
 	}
 
 	before := CalculateAllocated(transactions)
