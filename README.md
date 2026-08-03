@@ -7,6 +7,7 @@ Functionality includes:
 - Local web UI for uploading and reviewing AmEx CSV files
 - Matching Swedish grocery transactions by configurable store prefixes
 - Summing matched grocery purchases across one or more files
+- Adjusting each transaction to the amount still to split after repayments
 - Allocating each grocery transaction between two participants
 - Reviewing matched and unmatched transactions
 - CLI support for the same core CSV processing workflow
@@ -38,7 +39,7 @@ Then open this address in your browser:
 http://localhost:8080
 ```
 
-The web UI lets you upload one or more AmEx CSV files, edit grocery prefixes, review matched and unmatched transactions, and choose an allocation for each included transaction. An allocation can be split evenly, assigned to participant 1, or assigned to participant 2.
+The web UI lets you upload one or more AmEx CSV files, edit grocery prefixes, review matched and unmatched transactions, and choose an allocation for each included transaction. The imported amount remains visible, while **Amount to split** lets you enter the signed amount that remains after repayments. An allocation can be split evenly, assigned to participant 1, or assigned to participant 2.
 
 By default, the web server only listens on your own machine at `127.0.0.1:8080`. To make it reachable from other devices on your local network later, bind it to all network interfaces:
 
@@ -204,7 +205,7 @@ The store file is one prefix per line. Blank lines and lines starting with `#` a
 
 ## Amounts
 
-Transaction amounts retain the exact positive or negative sign from the CSV. Refunds and credits therefore reduce the total and the participant allocation to which they are assigned.
+Imported transaction amounts retain the exact positive or negative sign from the CSV. When someone has already paid part of a transaction, use the web UI's **Amount to split** field to enter the signed remainder; the original imported amount is kept unchanged for reference. Refunds and credits therefore reduce the total and the participant allocation to which they are assigned.
 
 The CLI splits all matched transactions evenly. Use the web UI when a transaction needs to be assigned entirely to one participant.
 
