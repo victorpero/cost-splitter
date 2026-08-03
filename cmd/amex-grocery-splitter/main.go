@@ -18,7 +18,6 @@ import (
 type cliConfig struct {
 	storesPath    string
 	showUnmatched bool
-	amountMode    split.AmountMode
 	currency      string
 	files         []string
 }
@@ -55,7 +54,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 		return 1
 	}
 
-	analysis := report.Analyze(transactions, groceryMatcher, config.amountMode)
+	analysis := report.Analyze(transactions, groceryMatcher)
 
 	if err := printReport(stdout, config, analysis); err != nil {
 		fmt.Fprintf(stderr, "Error: %v\n", err)
@@ -71,15 +70,9 @@ func parseFlags(args []string, output io.Writer) (cliConfig, error) {
 
 	storesPath := flags.String("stores", "", "path to grocery store prefix file")
 	showUnmatched := flags.Bool("show-unmatched", false, "show non-grocery transactions for review")
-	amountModeValue := flags.String("amount-mode", string(split.AmountModeAbsolute), "amount handling: absolute or signed")
 	currency := flags.String("currency", "SEK", "currency label used in terminal output")
 
 	if err := flags.Parse(args); err != nil {
-		return cliConfig{}, err
-	}
-
-	mode, err := split.ParseAmountMode(*amountModeValue)
-	if err != nil {
 		return cliConfig{}, err
 	}
 
@@ -96,7 +89,6 @@ func parseFlags(args []string, output io.Writer) (cliConfig, error) {
 	return cliConfig{
 		storesPath:    *storesPath,
 		showUnmatched: *showUnmatched,
-		amountMode:    mode,
 		currency:      currencyLabel,
 		files:         files,
 	}, nil
@@ -119,13 +111,14 @@ func printReport(output io.Writer, config cliConfig, analysis report.Analysis) e
 	if len(analysis.Matched) == 0 {
 		fmt.Fprintln(output, "No grocery transactions matched.")
 	} else {
-		printTransactions(output, config.currency, config.amountMode, analysis.Matched)
+		printTransactions(output, config.currency, analysis.Matched)
 	}
 
 	fmt.Fprintln(output)
 	fmt.Fprintf(output, "Matched transactions: %d\n", len(analysis.Matched))
 	fmt.Fprintf(output, "Total grocery amount: %s\n", split.FormatCents(config.currency, analysis.Result.TotalCents))
-	fmt.Fprintf(output, "Amount per person:   %s\n", split.FormatHalfCents(config.currency, analysis.Result.TotalCents))
+	fmt.Fprintf(output, "Participant 1:       %s\n", split.FormatHalfCents(config.currency, analysis.Result.ParticipantOneHalfCents))
+	fmt.Fprintf(output, "Participant 2:       %s\n", split.FormatHalfCents(config.currency, analysis.Result.ParticipantTwoHalfCents))
 
 	if config.showUnmatched {
 		fmt.Fprintln(output)
@@ -133,14 +126,14 @@ func printReport(output io.Writer, config cliConfig, analysis report.Analysis) e
 		if len(analysis.Unmatched) == 0 {
 			fmt.Fprintln(output, "No unmatched transactions.")
 		} else {
-			printTransactions(output, config.currency, config.amountMode, analysis.Unmatched)
+			printTransactions(output, config.currency, analysis.Unmatched)
 		}
 	}
 
 	return nil
 }
 
-func printTransactions(output io.Writer, currency string, mode split.AmountMode, transactions []transaction.Transaction) {
+func printTransactions(output io.Writer, currency string, transactions []transaction.Transaction) {
 	writer := tabwriter.NewWriter(output, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(writer, "Date\tAmount\tDescription\tSource")
 	for _, tx := range transactions {
@@ -148,7 +141,7 @@ func printTransactions(output io.Writer, currency string, mode split.AmountMode,
 			writer,
 			"%s\t%s\t%s\t%s:%d\n",
 			tx.Date.Format("2006-01-02"),
-			split.FormatCents(currency, report.DisplayAmountCents(tx.AmountCents, mode)),
+			split.FormatCents(currency, tx.AmountCents),
 			tx.Description,
 			tx.SourceFile,
 			tx.SourceLine,
