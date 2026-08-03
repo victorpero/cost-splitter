@@ -15,6 +15,9 @@ env:
 
 jobs:
   publish:
+    # A manually dispatched workflow can select any ref. Never publish a
+    # production image unless that ref is main.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:

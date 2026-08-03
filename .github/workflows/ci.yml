@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Download Go modules
+        run: go mod download
+
+      - name: Check Go formatting
+        run: |
+          unformatted="$(gofmt -l $(git ls-files '*.go'))"
+          test -z "$unformatted" || {
+            echo "The following files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          }
+
+      - name: Lint with go vet
+        run: go vet ./...
+
+      - name: Type check
+        run: go test -run '^$' ./...
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build Go applications
+        run: go build -trimpath ./...
+
+      - name: Build production container image
+        run: docker build --tag amex-grocery-splitter-se:ci .
