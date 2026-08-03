@@ -191,7 +191,6 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 		allocations = map[string]split.Allocation{}
 		splitAmounts = map[string]int64{}
 	}
-	applyManualSelectionChanges(r, includedIDs, excludedIDs)
 	allocations, err = allocationsFromRequest(r, transactions, allocations)
 	if err != nil {
 		data.Error = err.Error()
@@ -204,6 +203,7 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 		s.render(w, http.StatusBadRequest, data)
 		return
 	}
+	applyManualSelectionChanges(r, includedIDs, excludedIDs, allocations, splitAmounts)
 	analysis := analyzeTransactions(transactions, groceryMatcher, includedIDs, excludedIDs, allocations, splitAmounts)
 	filteredIncludedIDs := filterIncludedIDs(transactions, includedIDs)
 	filteredExcludedIDs := filterIncludedIDs(transactions, excludedIDs)
@@ -350,7 +350,7 @@ func excludedIDsFromRequest(r *http.Request) map[string]struct{} {
 	return idsFromValues(r.MultipartForm.Value["excluded_tx"])
 }
 
-func applyManualSelectionChanges(r *http.Request, includedIDs map[string]struct{}, excludedIDs map[string]struct{}) {
+func applyManualSelectionChanges(r *http.Request, includedIDs map[string]struct{}, excludedIDs map[string]struct{}, allocations map[string]split.Allocation, splitAmounts map[string]int64) {
 	for _, id := range r.MultipartForm.Value["include_tx"] {
 		if id = strings.TrimSpace(id); id != "" {
 			includedIDs[id] = struct{}{}
@@ -361,6 +361,8 @@ func applyManualSelectionChanges(r *http.Request, includedIDs map[string]struct{
 		if id = strings.TrimSpace(id); id != "" {
 			delete(includedIDs, id)
 			excludedIDs[id] = struct{}{}
+			delete(allocations, id)
+			delete(splitAmounts, id)
 		}
 	}
 }
