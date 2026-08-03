@@ -7,9 +7,8 @@ Functionality includes:
 - Local web UI for uploading and reviewing AmEx CSV files
 - Matching Swedish grocery transactions by configurable store prefixes
 - Summing matched grocery purchases across one or more files
-- Splitting the grocery total between two people
+- Allocating each grocery transaction between two participants
 - Reviewing matched and unmatched transactions
-- Choosing whether amounts are handled as absolute costs or signed values
 - CLI support for the same core CSV processing workflow
 
 ## Matching
@@ -39,7 +38,7 @@ Then open this address in your browser:
 http://localhost:8080
 ```
 
-The web UI lets you upload one or more AmEx CSV files, edit grocery prefixes, choose signed or absolute amount handling, and review matched and unmatched transactions.
+The web UI lets you upload one or more AmEx CSV files, edit grocery prefixes, review matched and unmatched transactions, and choose an allocation for each included transaction. An allocation can be split evenly, assigned to participant 1, or assigned to participant 2.
 
 By default, the web server only listens on your own machine at `127.0.0.1:8080`. To make it reachable from other devices on your local network later, bind it to all network interfaces:
 
@@ -195,12 +194,6 @@ Show unmatched transactions for review:
 amex-grocery-splitter --show-unmatched transactions.csv
 ```
 
-Use signed amounts to inspect refunds or credits:
-
-```sh
-amex-grocery-splitter --amount-mode signed transactions.csv
-```
-
 Use a custom grocery-prefix file:
 
 ```sh
@@ -211,13 +204,9 @@ The store file is one prefix per line. Blank lines and lines starting with `#` a
 
 ## Amounts
 
-By default, matched transaction amounts are treated as costs using absolute values. This handles AmEx exports where purchases may appear as either positive or negative values.
+Transaction amounts retain the exact positive or negative sign from the CSV. Refunds and credits therefore reduce the total and the participant allocation to which they are assigned.
 
-To preserve signs exactly as they appear in the CSV:
-
-```sh
-amex-grocery-splitter --amount-mode signed transactions.csv
-```
+The CLI splits all matched transactions evenly. Use the web UI when a transaction needs to be assigned entirely to one participant.
 
 ## CSV support
 
