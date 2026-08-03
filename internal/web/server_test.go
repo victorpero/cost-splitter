@@ -165,6 +165,79 @@ func TestServerPostRemovesSelectedMatchedTransactions(t *testing.T) {
 	}
 }
 
+func TestServerPostReincludedTransactionUsesImportedAmountByDefault(t *testing.T) {
+	server := newTestServer(t)
+	body, contentType := multipartRequestBody(t, map[string]string{
+		"currency":       "SEK",
+		"show_unmatched": "on",
+		"prefixes":       "ICA\nCOOP",
+		"activity.csv":   "Datum;Beskrivning;Belopp\n2026-05-11;ICA ONE;-100,00\n2026-05-12;COOP TWO;-50,00\n",
+	})
+	request := httptest.NewRequest(http.MethodPost, "/", body)
+	request.Header.Set("Content-Type", contentType)
+	response := httptest.NewRecorder()
+
+	server.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("initial status = %d, want %d\nbody:\n%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	state := hiddenFieldValue(t, response.Body.String(), "transactions_state")
+
+	body, contentType = multipartRequestBody(t, map[string]string{
+		"currency":           "SEK",
+		"show_unmatched":     "on",
+		"prefixes":           "ICA\nCOOP",
+		"transactions_state": state,
+		"split_amount_tx_0":  "-60,00",
+	})
+	request = httptest.NewRequest(http.MethodPost, "/", body)
+	request.Header.Set("Content-Type", contentType)
+	response = httptest.NewRecorder()
+
+	server.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("adjust status = %d, want %d\nbody:\n%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	state = hiddenFieldValue(t, response.Body.String(), "transactions_state")
+
+	body, contentType = multipartRequestBody(t, map[string]string{
+		"currency":           "SEK",
+		"show_unmatched":     "on",
+		"prefixes":           "ICA\nCOOP",
+		"transactions_state": state,
+		"split_amount_tx_0":  "-60,00",
+		"remove_tx":          "0",
+	})
+	request = httptest.NewRequest(http.MethodPost, "/", body)
+	request.Header.Set("Content-Type", contentType)
+	response = httptest.NewRecorder()
+
+	server.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("remove status = %d, want %d\nbody:\n%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	state = hiddenFieldValue(t, response.Body.String(), "transactions_state")
+
+	body, contentType = multipartRequestBody(t, map[string]string{
+		"currency":           "SEK",
+		"show_unmatched":     "on",
+		"prefixes":           "ICA\nCOOP",
+		"transactions_state": state,
+		"include_tx":         "0",
+	})
+	request = httptest.NewRequest(http.MethodPost, "/", body)
+	request.Header.Set("Content-Type", contentType)
+	response = httptest.NewRecorder()
+
+	server.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("reinclude status = %d, want %d\nbody:\n%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	if got := splitAmountValue(t, response.Body.String(), "0"); got != "-100,00" {
+		t.Fatalf("amount to split after reinclude = %q, want -100,00", got)
+	}
+}
+
 func TestServerPostStoresAllocationsIndependently(t *testing.T) {
 	server := newTestServer(t)
 	body, contentType := multipartRequestBody(t, map[string]string{
