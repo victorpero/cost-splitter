@@ -53,22 +53,23 @@ type formData struct {
 }
 
 type viewTransaction struct {
-	ID          string
-	Date        string
-	Description string
-	Amount      string
-	Source      string
-	Allocation  split.Allocation
+	ID             string
+	Date           string
+	Description    string
+	ImportedAmount string
+	SplitAmount    string
+	Allocation     split.Allocation
 }
 
 type transactionTable struct {
-	Rows           []viewTransaction
-	Selectable     bool
-	SelectName     string
-	SelectGroup    string
-	SelectAllLabel string
-	SelectLabel    string
-	ShowAllocation bool
+	Rows            []viewTransaction
+	Selectable      bool
+	SelectName      string
+	SelectGroup     string
+	SelectAllLabel  string
+	SelectLabel     string
+	ShowAllocation  bool
+	ShowSplitAmount bool
 }
 
 type indexedTransaction struct {
@@ -80,6 +81,7 @@ type storedState struct {
 	TotalFiles   int                         `json:"total_files"`
 	Transactions []storedTransaction         `json:"transactions"`
 	Allocations  map[string]split.Allocation `json:"allocations"`
+	SplitAmounts map[string]int64            `json:"split_amounts"`
 }
 
 type storedTransaction struct {
@@ -169,7 +171,7 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 	}
 
 	files := r.MultipartForm.File["files"]
-	transactions, totalFiles, allocations, err := transactionsFromRequest(files, r.FormValue("transactions_state"))
+	transactions, totalFiles, allocations, splitAmounts, err := transactionsFromRequest(files, r.FormValue("transactions_state"))
 	if err != nil {
 		data.Error = err.Error()
 		s.render(w, http.StatusBadRequest, data)
@@ -187,6 +189,7 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 		includedIDs = map[string]struct{}{}
 		excludedIDs = map[string]struct{}{}
 		allocations = map[string]split.Allocation{}
+		splitAmounts = map[string]int64{}
 	}
 	applyManualSelectionChanges(r, includedIDs, excludedIDs)
 	allocations, err = allocationsFromRequest(r, transactions, allocations)
@@ -195,7 +198,13 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 		s.render(w, http.StatusBadRequest, data)
 		return
 	}
-	analysis := analyzeTransactions(transactions, groceryMatcher, includedIDs, excludedIDs, allocations)
+	splitAmounts, err = splitAmountsFromRequest(r, transactions, splitAmounts)
+	if err != nil {
+		data.Error = err.Error()
+		s.render(w, http.StatusBadRequest, data)
+		return
+	}
+	analysis := analyzeTransactions(transactions, groceryMatcher, includedIDs, excludedIDs, allocations, splitAmounts)
 	filteredIncludedIDs := filterIncludedIDs(transactions, includedIDs)
 	filteredExcludedIDs := filterIncludedIDs(transactions, excludedIDs)
 
@@ -204,23 +213,24 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 	data.TotalFiles = totalFiles
 	data.TotalRows = len(transactions)
 	data.MatchedTable = transactionTable{
-		Rows:           toViewTransactions(analysis.Matched, form.Currency, allocations),
-		Selectable:     true,
-		SelectName:     "remove_tx",
-		SelectGroup:    "matched",
-		SelectAllLabel: "Select all included transactions",
-		SelectLabel:    "Select transaction to remove",
-		ShowAllocation: true,
+		Rows:            toViewTransactions(analysis.Matched, form.Currency, allocations, splitAmounts),
+		Selectable:      true,
+		SelectName:      "remove_tx",
+		SelectGroup:     "matched",
+		SelectAllLabel:  "Select all included transactions",
+		SelectLabel:     "Select transaction to remove",
+		ShowAllocation:  true,
+		ShowSplitAmount: true,
 	}
 	data.UnmatchedTable = transactionTable{
-		Rows:           toViewTransactions(analysis.Unmatched, form.Currency, allocations),
+		Rows:           toViewTransactions(analysis.Unmatched, form.Currency, allocations, splitAmounts),
 		Selectable:     true,
 		SelectName:     "include_tx",
 		SelectGroup:    "unmatched",
 		SelectAllLabel: "Select all unmatched transactions",
 		SelectLabel:    "Select transaction to include",
 	}
-	data.TransactionsState = encodeTransactionsState(transactions, totalFiles, allocations)
+	data.TransactionsState = encodeTransactionsState(transactions, totalFiles, allocations, splitAmounts)
 	data.IncludedIDs = filteredIncludedIDs
 	data.ExcludedIDs = filteredExcludedIDs
 	data.TotalAmount = split.FormatCents(form.Currency, analysis.Result.TotalCents)
@@ -230,23 +240,23 @@ func (s *Server) handleAnalyze(w http.ResponseWriter, r *http.Request) {
 	s.render(w, http.StatusOK, data)
 }
 
-func transactionsFromRequest(files []*multipart.FileHeader, encodedState string) ([]indexedTransaction, int, map[string]split.Allocation, error) {
+func transactionsFromRequest(files []*multipart.FileHeader, encodedState string) ([]indexedTransaction, int, map[string]split.Allocation, map[string]int64, error) {
 	if len(files) > 0 {
 		transactions, err := parseUploadedFiles(files)
 		if err != nil {
-			return nil, 0, nil, err
+			return nil, 0, nil, nil, err
 		}
-		return indexTransactions(transactions), len(files), map[string]split.Allocation{}, nil
+		return indexTransactions(transactions), len(files), map[string]split.Allocation{}, map[string]int64{}, nil
 	}
 
 	if strings.TrimSpace(encodedState) == "" {
-		return nil, 0, nil, nil
+		return nil, 0, nil, nil, nil
 	}
-	transactions, totalFiles, allocations, err := decodeTransactionsState(encodedState)
+	transactions, totalFiles, allocations, splitAmounts, err := decodeTransactionsState(encodedState)
 	if err != nil {
-		return nil, 0, nil, err
+		return nil, 0, nil, nil, err
 	}
-	return transactions, totalFiles, allocations, nil
+	return transactions, totalFiles, allocations, splitAmounts, nil
 }
 
 func parseUploadedFiles(files []*multipart.FileHeader) ([]transaction.Transaction, error) {
@@ -287,7 +297,7 @@ type indexedAnalysis struct {
 	Result    split.Result
 }
 
-func analyzeTransactions(transactions []indexedTransaction, groceryMatcher *matcher.PrefixMatcher, includedIDs map[string]struct{}, excludedIDs map[string]struct{}, allocations map[string]split.Allocation) indexedAnalysis {
+func analyzeTransactions(transactions []indexedTransaction, groceryMatcher *matcher.PrefixMatcher, includedIDs map[string]struct{}, excludedIDs map[string]struct{}, allocations map[string]split.Allocation, splitAmounts map[string]int64) indexedAnalysis {
 	matched := make([]indexedTransaction, 0)
 	unmatched := make([]indexedTransaction, 0)
 
@@ -310,8 +320,9 @@ func analyzeTransactions(transactions []indexedTransaction, groceryMatcher *matc
 	allocated := make([]split.AllocatedTransaction, 0, len(matched))
 	for _, tx := range matched {
 		allocated = append(allocated, split.AllocatedTransaction{
-			Transaction: tx.TX,
-			Allocation:  allocationForTransaction(tx.ID, allocations),
+			Transaction:      tx.TX,
+			SplitAmountCents: splitAmountForTransaction(tx, splitAmounts),
+			Allocation:       allocationForTransaction(tx.ID, allocations),
 		})
 	}
 
@@ -419,11 +430,51 @@ func allocationForTransaction(id string, allocations map[string]split.Allocation
 	return split.AllocationSplitEvenly
 }
 
-func encodeTransactionsState(transactions []indexedTransaction, totalFiles int, allocations map[string]split.Allocation) string {
+func splitAmountsFromRequest(r *http.Request, transactions []indexedTransaction, stored map[string]int64) (map[string]int64, error) {
+	splitAmounts := filterSplitAmounts(transactions, stored)
+	for name, values := range r.MultipartForm.Value {
+		const prefix = "split_amount_tx_"
+		if !strings.HasPrefix(name, prefix) || len(values) == 0 {
+			continue
+		}
+
+		amount, err := parser.ParseAmountCents(values[len(values)-1])
+		if err != nil {
+			return nil, fmt.Errorf("amount to split for transaction %s: %w", strings.TrimPrefix(name, prefix), err)
+		}
+		splitAmounts[strings.TrimPrefix(name, prefix)] = amount
+	}
+	return filterSplitAmounts(transactions, splitAmounts), nil
+}
+
+func filterSplitAmounts(transactions []indexedTransaction, splitAmounts map[string]int64) map[string]int64 {
+	existingIDs := make(map[string]struct{}, len(transactions))
+	for _, tx := range transactions {
+		existingIDs[tx.ID] = struct{}{}
+	}
+
+	filtered := make(map[string]int64, len(splitAmounts))
+	for id, amount := range splitAmounts {
+		if _, ok := existingIDs[id]; ok {
+			filtered[id] = amount
+		}
+	}
+	return filtered
+}
+
+func splitAmountForTransaction(tx indexedTransaction, splitAmounts map[string]int64) int64 {
+	if amount, ok := splitAmounts[tx.ID]; ok {
+		return amount
+	}
+	return tx.TX.AmountCents
+}
+
+func encodeTransactionsState(transactions []indexedTransaction, totalFiles int, allocations map[string]split.Allocation, splitAmounts map[string]int64) string {
 	state := storedState{
 		TotalFiles:   totalFiles,
 		Transactions: make([]storedTransaction, 0, len(transactions)),
 		Allocations:  filterAllocations(transactions, allocations),
+		SplitAmounts: filterSplitAmounts(transactions, splitAmounts),
 	}
 	for _, tx := range transactions {
 		state.Transactions = append(state.Transactions, storedTransaction{
@@ -443,25 +494,25 @@ func encodeTransactionsState(transactions []indexedTransaction, totalFiles int, 
 	return base64.StdEncoding.EncodeToString(encoded)
 }
 
-func decodeTransactionsState(encodedState string) ([]indexedTransaction, int, map[string]split.Allocation, error) {
+func decodeTransactionsState(encodedState string) ([]indexedTransaction, int, map[string]split.Allocation, map[string]int64, error) {
 	decoded, err := base64.StdEncoding.DecodeString(encodedState)
 	if err != nil {
-		return nil, 0, nil, fmt.Errorf("Could not restore uploaded transactions. Re-upload the CSV file.")
+		return nil, 0, nil, nil, fmt.Errorf("Could not restore uploaded transactions. Re-upload the CSV file.")
 	}
 
 	var state storedState
 	if err := json.Unmarshal(decoded, &state); err != nil {
-		return nil, 0, nil, fmt.Errorf("Could not restore uploaded transactions. Re-upload the CSV file.")
+		return nil, 0, nil, nil, fmt.Errorf("Could not restore uploaded transactions. Re-upload the CSV file.")
 	}
 
 	transactions := make([]indexedTransaction, 0, len(state.Transactions))
 	for _, stored := range state.Transactions {
 		date, err := time.Parse("2006-01-02", stored.Date)
 		if err != nil {
-			return nil, 0, nil, fmt.Errorf("Could not restore uploaded transactions. Re-upload the CSV file.")
+			return nil, 0, nil, nil, fmt.Errorf("Could not restore uploaded transactions. Re-upload the CSV file.")
 		}
 		if strings.TrimSpace(stored.ID) == "" {
-			return nil, 0, nil, fmt.Errorf("Could not restore uploaded transactions. Re-upload the CSV file.")
+			return nil, 0, nil, nil, fmt.Errorf("Could not restore uploaded transactions. Re-upload the CSV file.")
 		}
 		transactions = append(transactions, indexedTransaction{
 			ID: stored.ID,
@@ -478,26 +529,35 @@ func decodeTransactionsState(encodedState string) ([]indexedTransaction, int, ma
 	allocations := filterAllocations(transactions, state.Allocations)
 	for id, allocation := range allocations {
 		if _, err := split.ParseAllocation(string(allocation)); err != nil {
-			return nil, 0, nil, fmt.Errorf("Could not restore uploaded transactions. Re-upload the CSV file.")
+			return nil, 0, nil, nil, fmt.Errorf("Could not restore uploaded transactions. Re-upload the CSV file.")
 		}
 		allocations[id] = allocation
 	}
-	return transactions, state.TotalFiles, allocations, nil
+	return transactions, state.TotalFiles, allocations, filterSplitAmounts(transactions, state.SplitAmounts), nil
 }
 
-func toViewTransactions(transactions []indexedTransaction, currency string, allocations map[string]split.Allocation) []viewTransaction {
+func toViewTransactions(transactions []indexedTransaction, currency string, allocations map[string]split.Allocation, splitAmounts map[string]int64) []viewTransaction {
 	view := make([]viewTransaction, 0, len(transactions))
 	for _, tx := range transactions {
 		view = append(view, viewTransaction{
-			ID:          tx.ID,
-			Date:        tx.TX.Date.Format("2006-01-02"),
-			Description: tx.TX.Description,
-			Amount:      split.FormatCents(currency, tx.TX.AmountCents),
-			Source:      fmt.Sprintf("%s:%d", tx.TX.SourceFile, tx.TX.SourceLine),
-			Allocation:  allocationForTransaction(tx.ID, allocations),
+			ID:             tx.ID,
+			Date:           tx.TX.Date.Format("2006-01-02"),
+			Description:    tx.TX.Description,
+			ImportedAmount: split.FormatCents(currency, tx.TX.AmountCents),
+			SplitAmount:    formatAmountInput(splitAmountForTransaction(tx, splitAmounts)),
+			Allocation:     allocationForTransaction(tx.ID, allocations),
 		})
 	}
 	return view
+}
+
+func formatAmountInput(cents int64) string {
+	sign := ""
+	if cents < 0 {
+		sign = "-"
+		cents = -cents
+	}
+	return fmt.Sprintf("%s%d,%02d", sign, cents/100, cents%100)
 }
 
 func (s *Server) render(w http.ResponseWriter, status int, data pageData) {
@@ -542,7 +602,7 @@ const pageTemplate = `<!doctype html>
       border-bottom: 1px solid var(--line);
     }
     .wrap {
-      width: min(1180px, calc(100% - 32px));
+      width: min(1380px, calc(100% - 32px));
       margin: 0 auto;
     }
     .topbar {
@@ -566,7 +626,7 @@ const pageTemplate = `<!doctype html>
     }
     .layout {
       display: grid;
-      grid-template-columns: 360px minmax(0, 1fr);
+      grid-template-columns: 300px minmax(0, 1fr);
       gap: 24px;
       align-items: start;
     }
@@ -695,15 +755,15 @@ const pageTemplate = `<!doctype html>
       font-size: 13px;
     }
     .table-wrap {
-      overflow-x: auto;
+      overflow: visible;
       border: 1px solid var(--line);
       border-radius: 8px;
     }
     table {
       width: 100%;
-      min-width: 720px;
       border-collapse: collapse;
       background: #fff;
+      table-layout: fixed;
     }
     th,
     td {
@@ -728,27 +788,50 @@ const pageTemplate = `<!doctype html>
       font-variant-numeric: tabular-nums;
     }
     .select-cell {
-      width: 44px;
+      width: 42px;
       text-align: center;
+    }
+    .date-cell {
+      width: 88px;
+      white-space: nowrap;
+    }
+    .description-cell {
+      overflow-wrap: anywhere;
+    }
+    .imported-amount-cell {
+      width: 150px;
     }
     .select-cell input {
       inline-size: 16px;
       block-size: 16px;
     }
     .allocation-cell {
-      min-width: 170px;
+      width: 150px;
     }
     .allocation-cell select {
-      min-width: 155px;
+      min-width: 0;
+      width: 100%;
       padding: 7px 8px;
       font-size: 13px;
+    }
+    .split-amount-cell {
+      width: 150px;
+      white-space: nowrap;
+    }
+    .split-amount-cell input {
+      min-width: 0;
+      width: 100%;
+      padding: 7px 8px;
+      font-size: 13px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
     }
     .empty {
       padding: 36px 18px;
       color: var(--muted);
       text-align: center;
     }
-    @media (max-width: 860px) {
+    @media (max-width: 1080px) {
       .topbar {
         align-items: flex-start;
         flex-direction: column;
@@ -779,6 +862,67 @@ const pageTemplate = `<!doctype html>
       }
       .metric:last-child {
         border-bottom: 0;
+      }
+    }
+    @media (max-width: 680px) {
+      .table-wrap {
+        border: 0;
+        border-radius: 0;
+      }
+      table,
+      tbody,
+      tr,
+      td {
+        display: block;
+        width: 100%;
+      }
+      thead {
+        display: none;
+      }
+      tr {
+        margin-bottom: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      tr:last-child {
+        margin-bottom: 0;
+      }
+      td {
+        display: grid;
+        grid-template-columns: minmax(104px, 0.85fr) minmax(0, 1.15fr);
+        gap: 10px;
+        align-items: center;
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+      }
+      td::before {
+        content: attr(data-label);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+      .select-cell,
+      .date-cell,
+      .imported-amount-cell,
+      .split-amount-cell,
+      .allocation-cell {
+        width: auto;
+      }
+      .amount {
+        text-align: left;
+      }
+      .select-cell {
+        text-align: left;
+      }
+      .select-cell input {
+        justify-self: start;
+      }
+      .allocation-cell select,
+      .split-amount-cell input {
+        width: 100%;
       }
     }
   </style>
@@ -829,7 +973,7 @@ const pageTemplate = `<!doctype html>
             <div class="summary">
               <div class="metric"><span>Files</span><strong>{{.TotalFiles}}</strong></div>
               <div class="metric"><span>Rows</span><strong>{{.TotalRows}}</strong></div>
-              <div class="metric"><span>Total</span><strong>{{.TotalAmount}}</strong></div>
+              <div class="metric"><span>Total to Split</span><strong>{{.TotalAmount}}</strong></div>
               <div class="metric"><span>Participant 1</span><strong>{{.ParticipantOne}}</strong></div>
               <div class="metric"><span>Participant 2</span><strong>{{.ParticipantTwo}}</strong></div>
             </div>
@@ -884,22 +1028,27 @@ const pageTemplate = `<!doctype html>
         <thead>
           <tr>
             {{if .Selectable}}<th class="select-cell"><input type="checkbox" data-select-all="{{.SelectGroup}}" aria-label="{{.SelectAllLabel}}"></th>{{end}}
-            <th>Date</th>
-            <th>Description</th>
-            <th class="amount">Amount</th>
-            {{if .ShowAllocation}}<th>Allocation</th>{{end}}
-            <th>Source</th>
+            <th class="date-cell">Date</th>
+            <th class="description-cell">Description</th>
+            <th class="amount imported-amount-cell">Imported Amount</th>
+            {{if .ShowSplitAmount}}<th class="split-amount-cell">Amount to Split</th>{{end}}
+            {{if .ShowAllocation}}<th class="allocation-cell">Allocation</th>{{end}}
           </tr>
         </thead>
         <tbody>
           {{range .Rows}}
             <tr>
-              {{if $.Selectable}}<td class="select-cell"><input type="checkbox" name="{{$.SelectName}}" value="{{.ID}}" data-select-group="{{$.SelectGroup}}" aria-label="{{$.SelectLabel}}"></td>{{end}}
-              <td>{{.Date}}</td>
-              <td>{{.Description}}</td>
-              <td class="amount">{{.Amount}}</td>
+              {{if $.Selectable}}<td class="select-cell" data-label="Select"><input type="checkbox" name="{{$.SelectName}}" value="{{.ID}}" data-select-group="{{$.SelectGroup}}" aria-label="{{$.SelectLabel}}"></td>{{end}}
+              <td class="date-cell" data-label="Date">{{.Date}}</td>
+              <td class="description-cell" data-label="Description">{{.Description}}</td>
+              <td class="amount imported-amount-cell" data-label="Imported Amount">{{.ImportedAmount}}</td>
+              {{if $.ShowSplitAmount}}
+                <td class="split-amount-cell" data-label="Amount to Split">
+                  <input type="text" name="split_amount_tx_{{.ID}}" value="{{.SplitAmount}}" required aria-label="Amount to split for {{.Description}}">
+                </td>
+              {{end}}
               {{if $.ShowAllocation}}
-                <td class="allocation-cell">
+                <td class="allocation-cell" data-label="Allocation">
                   <select name="allocation_tx_{{.ID}}" aria-label="Allocation for {{.Description}}">
                     <option value="split_evenly" {{if eq .Allocation "split_evenly"}}selected{{end}}>Split evenly</option>
                     <option value="participant_one" {{if eq .Allocation "participant_one"}}selected{{end}}>Participant 1</option>
@@ -907,7 +1056,6 @@ const pageTemplate = `<!doctype html>
                   </select>
                 </td>
               {{end}}
-              <td>{{.Source}}</td>
             </tr>
           {{end}}
         </tbody>
