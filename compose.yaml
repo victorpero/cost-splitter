@@ -1,0 +1,22 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      API_ADDR: 0.0.0.0:8080
+      API_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      API_CURRENCY: SEK
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - api
+    environment:
+      API_BASE_URL: http://api:8080
+    ports:
+      - "3000:3000"

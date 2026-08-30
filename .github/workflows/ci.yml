@@ -27,6 +27,13 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
       - name: Download Go modules
         run: go mod download
 
@@ -51,5 +58,20 @@ jobs:
       - name: Build Go applications
         run: go build -trimpath ./...
 
-      - name: Build production container image
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Type-check frontend
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Build frontend container image
         run: docker build --tag cost-splitter:ci .
+
+      - name: Build API container image
+        run: docker build --file Dockerfile.api --tag cost-splitter-api:ci .

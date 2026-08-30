@@ -4,5 +4,8 @@ bin
 coverage.out
 tmp
 *.test
+frontend/.next
+frontend/node_modules
+frontend/tsconfig.tsbuildinfo
 Dockerfile
 README.md
