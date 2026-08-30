@@ -3,9 +3,9 @@ package report
 import (
 	"sort"
 
-	"github.com/victorpero/amex-grocery-splitter-se/internal/matcher"
-	"github.com/victorpero/amex-grocery-splitter-se/internal/split"
-	"github.com/victorpero/amex-grocery-splitter-se/internal/transaction"
+	"github.com/victorpero/cost-splitter/internal/matcher"
+	"github.com/victorpero/cost-splitter/internal/split"
+	"github.com/victorpero/cost-splitter/internal/transaction"
 )
 
 type Analysis struct {

@@ -1,3 +1,3 @@
-module github.com/victorpero/amex-grocery-splitter-se
+module github.com/victorpero/cost-splitter
 
 go 1.22

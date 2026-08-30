@@ -12,7 +12,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/victorpero/amex-grocery-splitter-se/internal/transaction"
+	"github.com/victorpero/cost-splitter/internal/transaction"
 )
 
 type MissingColumnsError struct {
