@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/victorpero/amex-grocery-splitter-se/internal/transaction"
+	"github.com/victorpero/cost-splitter/internal/transaction"
 )
 
 // Allocation identifies how one transaction is assigned between the two
