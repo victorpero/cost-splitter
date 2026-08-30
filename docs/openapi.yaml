@@ -1,0 +1,265 @@
+openapi: 3.1.0
+info:
+  title: Cost Splitter API
+  version: 1.0.0
+  description: |
+    Application-agnostic HTTP API for importing transaction data and calculating
+    two-participant cost allocations. Monetary amounts use integer cents; participant
+    totals use integer half-cents so odd cents can be divided exactly.
+servers:
+  - url: http://localhost:8080
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Check whether the API process is alive
+      responses:
+        "200":
+          description: API is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusEnvelope"
+  /readyz:
+    get:
+      operationId: getReadiness
+      summary: Check whether the API is ready to serve requests
+      responses:
+        "200":
+          description: API is ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusEnvelope"
+  /api/v1/defaults:
+    get:
+      operationId: getDefaults
+      summary: Get service defaults for a new client session
+      responses:
+        "200":
+          description: Defaults returned
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Defaults"
+  /api/v1/imports/amex:
+    post:
+      operationId: importAmexCSV
+      summary: Normalize one or more American Express CSV exports
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [files]
+              properties:
+                files:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        "200":
+          description: Files were normalized
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ImportResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+  /api/v1/split-calculations:
+    post:
+      operationId: calculateSplit
+      summary: Match and allocate a set of normalized transactions
+      description: |
+        `automatic` selection uses the supplied merchant prefixes. `included` and
+        `excluded` are explicit client overrides. Omitting `split_amount_cents` uses
+        the imported amount; omitting `allocation` splits the row evenly.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalculationRequest"
+      responses:
+        "200":
+          description: Calculation completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/CalculationResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+components:
+  responses:
+    BadRequest:
+      description: The transport-level request is invalid
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    UnprocessableEntity:
+      description: The supplied domain data cannot be processed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+  schemas:
+    StatusEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [status]
+          properties:
+            status:
+              type: string
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Stable machine-readable error category
+            message:
+              type: string
+              description: Human-readable diagnostic message
+    Defaults:
+      type: object
+      required: [currency, prefixes]
+      properties:
+        currency:
+          type: string
+          examples: [SEK]
+        prefixes:
+          type: array
+          items:
+            type: string
+    Transaction:
+      type: object
+      required: [id, date, description, amount_cents]
+      properties:
+        id:
+          type: string
+          description: Client-visible identifier unique within a calculation
+        date:
+          type: string
+          format: date
+        description:
+          type: string
+        amount_cents:
+          type: integer
+          format: int64
+          description: Signed imported amount in cents
+        source_file:
+          type: string
+        source_line:
+          type: integer
+          minimum: 0
+    CalculationTransaction:
+      allOf:
+        - $ref: "#/components/schemas/Transaction"
+        - type: object
+          properties:
+            selection:
+              type: string
+              default: automatic
+              enum: [automatic, included, excluded]
+            split_amount_cents:
+              type: integer
+              format: int64
+              description: Signed amount to allocate instead of the imported amount
+            allocation:
+              $ref: "#/components/schemas/Allocation"
+    CalculationRow:
+      allOf:
+        - $ref: "#/components/schemas/Transaction"
+        - type: object
+          required: [split_amount_cents, allocation]
+          properties:
+            split_amount_cents:
+              type: integer
+              format: int64
+            allocation:
+              $ref: "#/components/schemas/Allocation"
+    Allocation:
+      type: string
+      default: split_evenly
+      enum: [split_evenly, participant_one, participant_two]
+    ImportResult:
+      type: object
+      required: [files_count, rows_count, transactions]
+      properties:
+        files_count:
+          type: integer
+          minimum: 1
+        rows_count:
+          type: integer
+          minimum: 0
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Transaction"
+    CalculationRequest:
+      type: object
+      additionalProperties: false
+      required: [prefixes, transactions]
+      properties:
+        prefixes:
+          type: array
+          minItems: 1
+          items:
+            type: string
+        transactions:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/CalculationTransaction"
+    CalculationResult:
+      type: object
+      required: [included, unmatched, totals]
+      properties:
+        included:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalculationRow"
+        unmatched:
+          type: array
+          items:
+            $ref: "#/components/schemas/CalculationRow"
+        totals:
+          type: object
+          required: [total_cents, participant_one_half_cents, participant_two_half_cents]
+          properties:
+            total_cents:
+              type: integer
+              format: int64
+            participant_one_half_cents:
+              type: integer
+              format: int64
+            participant_two_half_cents:
+              type: integer
+              format: int64

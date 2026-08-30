@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-30T13:09:56Z",
+  "title": "Design System: Cost Splitter",
+  "extensions": {
+    "colorMeta": {
+      "canvas": { "role": "neutral", "displayName": "Warm Canvas", "canonical": "#f3f1eb" },
+      "panel": { "role": "neutral", "displayName": "Ledger Paper", "canonical": "#fffefa" },
+      "ink": { "role": "neutral", "displayName": "Accounting Ink", "canonical": "#17201d" },
+      "muted": { "role": "neutral", "displayName": "Provenance Gray", "canonical": "#68736e" },
+      "line": { "role": "neutral", "displayName": "Hairline Gray", "canonical": "#d8ddd8" },
+      "accent": { "role": "primary", "displayName": "Grocery Green", "canonical": "#087f6a" },
+      "accent-dark": { "role": "primary", "displayName": "Deep Grocery Green", "canonical": "#056554" },
+      "accent-pale": { "role": "primary", "displayName": "Washed Grocery Green", "canonical": "#e1f2ed" },
+      "danger": { "role": "semantic", "displayName": "Correction Red", "canonical": "#9c2f27" },
+      "danger-bg": { "role": "semantic", "displayName": "Correction Wash", "canonical": "#fff0ed" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Product name only." },
+      "headline": { "displayName": "Headline", "purpose": "Panel and empty-state headings." },
+      "title": { "displayName": "Title", "purpose": "Transaction-group headings." },
+      "body": { "displayName": "Body", "purpose": "Controls, records, descriptions, and supporting copy." },
+      "label": { "displayName": "Label", "purpose": "Uppercase metric and table labels." },
+      "data-entry": { "displayName": "Data Entry", "purpose": "Merchant-prefix editor only." }
+    },
+    "shadows": [
+      { "name": "field-focus-halo", "value": "0 0 0 3px rgb(8 127 106 / 12%)", "purpose": "Tight focus feedback on inputs, selects, and textareas." }
+    ],
+    "motion": [
+      { "name": "button-state", "value": "140ms ease", "purpose": "Background and one-pixel position feedback on buttons; position movement is removed for reduced motion." }
+    ],
+    "breakpoints": [
+      { "name": "ledger-compact", "value": "1120px" },
+      { "name": "ledger-mobile", "value": "780px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Runs the primary analyze or recalculate action at the end of the import form.",
+      "html": "<button class=\"ds-btn-primary\">Analyze CSV Files</button>",
+      "css": ".ds-btn-primary { border: 0; border-radius: 7px; background: var(--accent, #087f6a); color: white; cursor: pointer; font-family: \"Manrope Variable\", ui-sans-serif, sans-serif; font-size: 13px; font-weight: 720; padding: 11px 14px; transition: background 140ms ease, transform 140ms ease; } .ds-btn-primary:hover { background: var(--accent-dark, #056554); transform: translateY(-1px); } .ds-btn-primary:focus-visible { outline: 3px solid #63b9a6; outline-offset: 2px; } .ds-btn-primary:active { transform: translateY(0); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Re-imports the selected files after a calculation already exists.",
+      "html": "<button class=\"ds-btn-secondary\">Import selected files again</button>",
+      "css": ".ds-btn-secondary { border: 1px solid #bfd0ca; border-radius: 7px; background: transparent; color: var(--accent-dark, #056554); cursor: pointer; font-family: \"Manrope Variable\", ui-sans-serif, sans-serif; font-size: 13px; font-weight: 720; padding: 11px 14px; transition: background 140ms ease, transform 140ms ease; } .ds-btn-secondary:hover { background: var(--accent-pale, #e1f2ed); transform: translateY(-1px); } .ds-btn-secondary:focus-visible { outline: 3px solid #63b9a6; outline-offset: 2px; } .ds-btn-secondary:active { transform: translateY(0); }"
+    },
+    {
+      "name": "Text Action",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "Reversibly includes or removes a transaction without turning the action into a destructive red control.",
+      "html": "<button class=\"ds-btn-text\">Remove</button>",
+      "css": ".ds-btn-text { min-height: 40px; border: 0; border-radius: 7px; background: transparent; color: var(--accent-dark, #056554); cursor: pointer; font-family: \"Manrope Variable\", ui-sans-serif, sans-serif; font-size: 12px; font-weight: 720; padding: 8px 10px; transition: background 140ms ease, transform 140ms ease; } .ds-btn-text:hover { background: var(--accent-pale, #e1f2ed); transform: translateY(-1px); } .ds-btn-text:focus-visible { outline: 3px solid #63b9a6; outline-offset: 2px; } .ds-btn-text:active { transform: translateY(0); }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Compact neutral field used for currency and editable split amounts.",
+      "html": "<label class=\"ds-field-label\">Currency<input class=\"ds-field\" value=\"SEK\"></label>",
+      "css": ".ds-field-label { display: grid; gap: 7px; color: #4d5a55; font-family: \"Manrope Variable\", ui-sans-serif, sans-serif; font-size: 12px; font-weight: 760; } .ds-field { width: 100%; border: 1px solid #cfd6d1; border-radius: 7px; outline: none; background: white; color: var(--ink, #17201d); padding: 9px 10px; font: inherit; font-size: 13px; } .ds-field:hover { border-color: #bfd0ca; } .ds-field:focus { border-color: var(--accent, #087f6a); box-shadow: 0 0 0 3px rgb(8 127 106 / 12%); } .ds-field:focus-visible { outline: 3px solid #63b9a6; outline-offset: 2px; }"
+    },
+    {
+      "name": "Allocation Select",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Assigns a transaction evenly or to either participant.",
+      "html": "<label class=\"ds-select-label\">Allocation<select class=\"ds-select\"><option>Split evenly</option><option>Participant one</option><option>Participant two</option></select></label>",
+      "css": ".ds-select-label { display: grid; gap: 7px; color: #4d5a55; font-family: \"Manrope Variable\", ui-sans-serif, sans-serif; font-size: 12px; font-weight: 760; } .ds-select { width: 100%; min-width: 138px; border: 1px solid #cfd6d1; border-radius: 7px; outline: none; background: white; color: var(--ink, #17201d); padding: 9px 10px; font: inherit; font-size: 13px; } .ds-select:hover { border-color: #bfd0ca; } .ds-select:focus { border-color: var(--accent, #087f6a); box-shadow: 0 0 0 3px rgb(8 127 106 / 12%); } .ds-select:focus-visible { outline: 3px solid #63b9a6; outline-offset: 2px; }"
+    },
+    {
+      "name": "API Status Pill",
+      "kind": "chip",
+      "refersTo": "status-pill",
+      "description": "Desktop-only compact environment status in the application header.",
+      "html": "<span class=\"ds-api-status\">Next.js · Go API v1</span>",
+      "css": ".ds-api-status { display: inline-block; border: 1px solid #c5d4ce; border-radius: 999px; color: #486158; font-family: \"Manrope Variable\", ui-sans-serif, sans-serif; font-size: 12px; font-weight: 700; padding: 7px 11px; }"
+    },
+    {
+      "name": "Ledger Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Flat paper container used for both import controls and results.",
+      "html": "<section class=\"ds-panel\"><div class=\"ds-panel-heading\"><h2>Import activity</h2><p>Upload AmEx CSV exports and tune the matching rules.</p></div></section>",
+      "css": ".ds-panel { overflow: hidden; border: 1px solid rgb(113 127 120 / 34%); border-radius: 12px; background: var(--panel, #fffefa); color: var(--ink, #17201d); font-family: \"Manrope Variable\", ui-sans-serif, sans-serif; } .ds-panel-heading { padding: 20px; border-bottom: 1px solid var(--line, #d8ddd8); } .ds-panel-heading h2 { margin: 0; font-size: 17px; letter-spacing: -0.015em; } .ds-panel-heading p { margin: 5px 0 0; color: var(--muted, #68736e); font-size: 13px; }"
+    },
+    {
+      "name": "Error Alert",
+      "kind": "custom",
+      "refersTo": "error-alert",
+      "description": "Concise recoverable validation or API failure above the workspace.",
+      "html": "<div class=\"ds-error\" role=\"alert\">Choose at least one American Express CSV file.</div>",
+      "css": ".ds-error { border: 1px solid #efb7b0; border-radius: 9px; background: var(--danger-bg, #fff0ed); color: var(--danger, #9c2f27); font-family: \"Manrope Variable\", ui-sans-serif, sans-serif; font-size: 13px; font-weight: 700; padding: 12px 15px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Household Ledger",
+    "overview": "Cost Splitter is a calm household reconciliation worksheet: a practical paper-and-ink surface where imported charges become a compact, inspectable ledger. Warm paper, near-black ink, hairline rules, and one restrained grocery-green action color make the arithmetic feel trustworthy. The interface is made for finishing a real household task, not for resembling a generic finance dashboard.\n\nThe direction was resolved from concept seed 25bb4377 as the sixth grounded candidate. Its system-level comparator is the concept roll's deployable-sheet board: a finish bar for linked structure and responsive transformation, not a source of aerospace styling. The shipped system keeps imports, transactions, allocations, and totals visibly connected while remaining quiet enough for repeated use.\n\nThe experience tells a working story: set the import terms, reveal every piece of evidence, resolve exceptions, and close the ledger with exact totals. Progress stays visible without hiding the charges that produced it.",
+    "keyCharacteristics": [
+      "Warm, flat worksheet surfaces with precise hairline separation.",
+      "Dense but readable transaction evidence and tabular monetary figures.",
+      "Restrained green reserved for actions, focus, selection, and inclusion.",
+      "Desktop accounting tables that become complete transaction cards on mobile.",
+      "Explicit loading, error, empty, included, unmatched, and removed states."
+    ],
+    "rules": [
+      { "name": "The One Annotation Pen Rule", "body": "Green is the only routine accent; it signals available action, focus, selection, or confirmed inclusion and never decorates neutral data.", "section": "colors" },
+      { "name": "The Evidence Stays Ink Rule", "body": "Totals and transaction amounts remain neutral ink, including negative values. Meaning comes from labels, signs, and position rather than financial red/green coding.", "section": "colors" },
+      { "name": "The Arithmetic Holds Still Rule", "body": "Monetary figures use tabular numerals and never animate through intermediate values that could imply a false calculation.", "section": "typography" },
+      { "name": "The One Sans Voice Rule", "body": "Manrope carries headings, labels, controls, records, and totals; monospace is an editing aid, not a second brand voice.", "section": "typography" },
+      { "name": "The Phase Spacing Rule", "body": "Space expands between import, summary, included, and unmatched phases; rows remain compact so comparisons are fast.", "section": "layout" },
+      { "name": "The Ledger Must Unfold Rule", "body": "Mobile changes the transaction grammar instead of clipping or horizontally scrolling the desktop table.", "section": "layout" },
+      { "name": "The Flat Ledger Rule", "body": "Panels, tables, metrics, and transaction cards rest on the page without shadows; borders and paper tones carry structure.", "section": "elevation" },
+      { "name": "The State-Only Lift Rule", "body": "Elevation appears only as focus or hover feedback and must disappear when the interaction ends.", "section": "elevation" },
+      { "name": "The One Pill Rule", "body": "Pill geometry belongs to the compact API status only; ordinary buttons, fields, panels, and records keep the ledger's modest corner language.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do keep imported charges inspectable, editable, attributable to their source file, and reversible.",
+      "Do preserve exact currency and half-cent display behavior with tabular numerals.",
+      "Do keep semantic headings, direct labels, fieldsets where grouping applies, native form affordances, keyboard operation, visible focus, and at least 4.5:1 contrast for normal text.",
+      "Do keep loading, validation, empty, included, unmatched, removed, and re-included states explicit.",
+      "Do verify that a 390px viewport has no document-level horizontal overflow and contains at least one complete transaction record.",
+      "Do verify production captures without framework chrome; desktop must show the full working hierarchy and dense ledger without clipped labels or values, and the import, edit, remove, and re-include flow must produce no application console warnings or errors."
+    ],
+    "donts": [
+      "Don't turn the worksheet into a generic finance dashboard, decorative marketing page, or aerospace interface.",
+      "Don't hide the evidence behind an opaque total or detach summary figures from the records that produce them.",
+      "Don't use color alone to communicate destructive, included, matched, or unmatched state; actions keep explicit words.",
+      "Don't force the desktop table into a clipped or document-scrolling mobile viewport.",
+      "Don't add resting shadows, gratuitous pills, celebratory effects, or animated arithmetic.",
+      "Don't imply that uploaded files are stored; the implemented flow keeps them in memory for the requested calculation."
+    ]
+  }
+}
