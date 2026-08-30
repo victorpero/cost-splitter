@@ -1,25 +1,34 @@
 # syntax=docker/dockerfile:1
 
-FROM golang:1.22-alpine AS build
+FROM node:20-alpine AS dependencies
 
-WORKDIR /src
+WORKDIR /app
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
 
-COPY go.mod ./
-RUN go mod download
+FROM node:20-alpine AS build
 
-COPY . .
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/cost-splitter-web ./cmd/cost-splitter-web
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY --from=dependencies /app/node_modules ./node_modules
+COPY frontend/ ./
+RUN npm run build
 
-FROM alpine:3.20
+FROM node:20-alpine AS runtime
 
 LABEL org.opencontainers.image.source="https://github.com/victorpero/cost-splitter"
 
-RUN addgroup -S -g 1000 app && adduser -S -D -H -u 1000 -G app app
+WORKDIR /app
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    HOSTNAME=0.0.0.0 \
+    PORT=3000 \
+    API_BASE_URL=http://127.0.0.1:8080
 
-COPY --from=build /out/cost-splitter-web /usr/local/bin/cost-splitter-web
+COPY --from=build --chown=node:node /app/.next/standalone ./
+COPY --from=build --chown=node:node /app/.next/static ./.next/static
 
-USER 1000:1000
-EXPOSE 8080
+USER node
+EXPOSE 3000
 
-ENTRYPOINT ["cost-splitter-web"]
-CMD ["-addr", "0.0.0.0:8080"]
+ENTRYPOINT ["node", "server.js"]
