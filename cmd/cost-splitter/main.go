@@ -8,11 +8,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/victorpero/amex-grocery-splitter-se/internal/matcher"
-	"github.com/victorpero/amex-grocery-splitter-se/internal/parser"
-	"github.com/victorpero/amex-grocery-splitter-se/internal/report"
-	"github.com/victorpero/amex-grocery-splitter-se/internal/split"
-	"github.com/victorpero/amex-grocery-splitter-se/internal/transaction"
+	"github.com/victorpero/cost-splitter/internal/matcher"
+	"github.com/victorpero/cost-splitter/internal/parser"
+	"github.com/victorpero/cost-splitter/internal/report"
+	"github.com/victorpero/cost-splitter/internal/split"
+	"github.com/victorpero/cost-splitter/internal/transaction"
 )
 
 type cliConfig struct {
@@ -65,7 +65,7 @@ func run(args []string, stdout io.Writer, stderr io.Writer) int {
 }
 
 func parseFlags(args []string, output io.Writer) (cliConfig, error) {
-	flags := flag.NewFlagSet("amex-grocery-splitter", flag.ContinueOnError)
+	flags := flag.NewFlagSet("cost-splitter", flag.ContinueOnError)
 	flags.SetOutput(output)
 
 	storesPath := flags.String("stores", "", "path to grocery store prefix file")
@@ -78,7 +78,7 @@ func parseFlags(args []string, output io.Writer) (cliConfig, error) {
 
 	files := flags.Args()
 	if len(files) == 0 {
-		return cliConfig{}, fmt.Errorf("at least one CSV file is required\n\nUsage: amex-grocery-splitter [flags] <file.csv> [file2.csv]")
+		return cliConfig{}, fmt.Errorf("at least one CSV file is required\n\nUsage: cost-splitter [flags] <file.csv> [file2.csv]")
 	}
 
 	currencyLabel := strings.TrimSpace(*currency)

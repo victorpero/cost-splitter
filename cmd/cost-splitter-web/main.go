@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/victorpero/amex-grocery-splitter-se/internal/web"
+	"github.com/victorpero/cost-splitter/internal/web"
 )
 
 func main() {
@@ -23,7 +23,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Printf("amex-grocery-splitter web UI listening on http://%s", displayAddr(*addr))
+	log.Printf("cost-splitter web UI listening on http://%s", displayAddr(*addr))
 	if err := http.ListenAndServe(*addr, server); err != nil {
 		log.Fatal(err)
 	}

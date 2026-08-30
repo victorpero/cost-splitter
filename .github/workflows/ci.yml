@@ -52,4 +52,4 @@ jobs:
         run: go build -trimpath ./...
 
       - name: Build production container image
-        run: docker build --tag amex-grocery-splitter-se:ci .
+        run: docker build --tag cost-splitter:ci .

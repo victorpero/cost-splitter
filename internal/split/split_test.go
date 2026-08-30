@@ -3,7 +3,7 @@ package split
 import (
 	"testing"
 
-	"github.com/victorpero/amex-grocery-splitter-se/internal/transaction"
+	"github.com/victorpero/cost-splitter/internal/transaction"
 )
 
 func TestCalculatePreservesMixedTransactionSigns(t *testing.T) {

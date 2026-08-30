@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/victorpero/amex-grocery-splitter-se/internal/matcher"
-	"github.com/victorpero/amex-grocery-splitter-se/internal/parser"
-	"github.com/victorpero/amex-grocery-splitter-se/internal/split"
-	"github.com/victorpero/amex-grocery-splitter-se/internal/transaction"
+	"github.com/victorpero/cost-splitter/internal/matcher"
+	"github.com/victorpero/cost-splitter/internal/parser"
+	"github.com/victorpero/cost-splitter/internal/split"
+	"github.com/victorpero/cost-splitter/internal/transaction"
 )
 
 const maxUploadBytes = 32 << 20
@@ -575,7 +575,7 @@ const pageTemplate = `<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AmEx Grocery Splitter</title>
+  <title>Cost Splitter</title>
   <style>
     :root {
       color-scheme: light;
@@ -933,7 +933,7 @@ const pageTemplate = `<!doctype html>
   <header>
     <div class="wrap topbar">
       <div>
-        <h1>AmEx Grocery Splitter</h1>
+        <h1>Cost Splitter</h1>
         <div class="subtle">Upload American Express CSV exports and split matched Swedish grocery purchases.</div>
       </div>
       <div class="subtle">Files are processed by this server and are not stored.</div>
