@@ -6,4 +6,3 @@ coverage.out
 frontend/.next/
 frontend/node_modules/
 frontend/tsconfig.tsbuildinfo
-.impeccable/review/
