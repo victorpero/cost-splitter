@@ -1,7 +1,5 @@
 # Product
 
-<!-- impeccable:product-schema 1 -->
-
 ## Platform
 
 web
@@ -30,11 +28,11 @@ Users work from CSV files exported by American Express. They may import several 
 - Configure network and deployment concerns through environment variables.
 - Do not fabricate transactions, merchant evidence, or deployment status.
 
-## Evidence on Hand
+## Engineering Basis
 
 - Existing parser, matcher, and split-domain tests define calculation behavior.
-- Issue #13 defines the frontend/API separation and operational requirements.
-- `memory.md` records repository workflow and prior implementation decisions.
+- The frontend/API separation and operational requirements are documented in
+  [the architecture guide](docs/architecture.md) and the API contract.
 - No testimonials, customer logos, or usage benchmarks are available and none should be invented.
 
 ## Product Principles

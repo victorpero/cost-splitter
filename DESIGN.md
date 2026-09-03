@@ -109,15 +109,13 @@ components:
 
 # Design System: Cost Splitter
 
-<!-- impeccable:direction-seed 25bb4377 -->
-
 ## Overview
 
 **Creative North Star: "The Household Ledger"**
 
 Cost Splitter is a calm household reconciliation worksheet: a practical paper-and-ink surface where imported charges become a compact, inspectable ledger. Warm paper, near-black ink, hairline rules, and one restrained grocery-green action color make the arithmetic feel trustworthy. The interface is made for finishing a real household task, not for resembling a generic finance dashboard.
 
-The direction was resolved from concept seed `25bb4377` as the sixth grounded candidate. Its system-level comparator is the concept roll's deployable-sheet board: a finish bar for linked structure and responsive transformation, not a source of aerospace styling. The shipped system keeps imports, transactions, allocations, and totals visibly connected while remaining quiet enough for repeated use.
+The system keeps imports, transactions, allocations, and totals visibly connected while remaining quiet enough for repeated use.
 
 The experience tells a working story: set the import terms, reveal every piece of evidence, resolve exceptions, and close the ledger with exact totals. Progress stays visible without hiding the charges that produced it.
 
